@@ -1,0 +1,171 @@
+{% load static %}<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>hunian madiun — Prediksi Harga Kos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'prediksi/style.css' %}">
+</head>
+<body>
+  <header class="atas">
+    <div class="wadah atas-isi">
+      <a class="merek" href="{% url 'index' %}">hunian<b>madiun</b><i aria-hidden="true"></i></a>
+      <nav class="menu" aria-label="Navigasi halaman">
+        <a href="#prediksi">Prediksi</a>
+        <a href="#daftar-kos">Daftar kos</a>
+        <a href="#riwayat">Riwayat</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="wadah">
+      <p class="eyebrow">Sistem Cerdas &middot; Praktikum 14</p>
+      <h1>Estimasi Sewa Kos Terukur di <em>Madiun</em>.</h1>
+      <p class="lead">Hitung tarif bulanan yang masuk akal berdasarkan jarak kampus, rating, dan fasilitas AC, lalu bandingkan langsung dengan data kos aktual di Madiun.</p>
+      <ul class="fakta">
+        <li><strong>3</strong> faktor: jarak, rating, AC</li>
+        <li><strong>Regresi linear</strong> sebagai model</li>
+        <li><strong>Data P8</strong> sebagai sumber</li>
+      </ul>
+    </div>
+  </section>
+
+  <main class="wadah utama">
+    <div class="atas-prediksi" id="prediksi">
+      <section class="panel" aria-labelledby="judul-form">
+        <h2 id="judul-form">Hitung perkiraan</h2>
+        <form method="post" novalidate class="form-alat">
+          {% csrf_token %}
+          {% for field in form %}
+            <div class="isian isian-{{ field.name }}{% if field.errors %} salah{% endif %}">
+              <label {% if field.field.widget.input_type != 'radio' %}for="{{ field.id_for_label }}"{% endif %}>{{ field.label }}</label>
+              {{ field }}
+              {% for e in field.errors %}<p class="pesan-salah" role="alert">{{ e }}</p>{% endfor %}
+            </div>
+          {% endfor %}
+          <button type="submit" class="tombol">Prediksi harga</button>
+        </form>
+      </section>
+
+      <section class="panel hasil-panel" aria-labelledby="judul-hasil" aria-live="polite">
+        <h2 id="judul-hasil">Hasil prediksi</h2>
+        {% if hasil %}
+          <p class="hasil-label">Perkiraan sewa</p>
+          <p class="harga">Rp {{ hasil.harga }} ribu <span>per bulan</span></p>
+          <p class="ket">Kos {{ hasil.input.jarak_km }} km dari kampus, rating {{ hasil.input.rating }},
+            {% if hasil.input.ac == 'ya' %}dengan AC{% else %}tanpa AC{% endif %}.</p>
+          <div class="penjelasan">
+            <p class="hasil-label">Penjelasan AI</p>
+            {% if penjelasan.teks %}
+              <p>{{ penjelasan.teks|linebreaksbr }}</p>
+            {% else %}
+              <p class="ket">{{ penjelasan.galat }}</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="ket">Perkiraan sewa dan penjelasan akan muncul di sini setelah kamu menekan tombol Prediksi harga.</p>
+        {% endif %}
+      </section>
+    </div>
+
+    <div class="dua">
+      <section class="panel" aria-labelledby="judul-ac">
+        <h2 id="judul-ac">Rata-rata harga per kategori AC</h2>
+        <ul class="batang">
+          {% for g in grafik %}
+            <li>
+              <span class="nama">{% if g.ac == 'ya' %}Dengan AC{% else %}Tanpa AC{% endif %}</span>
+              <span class="lajur"><span class="isi" style="width: {{ g.persen }}%"></span></span>
+              <span class="nilai">Rp {{ g.rata }} rb</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+
+      <section class="panel" aria-labelledby="judul-jarak">
+        <h2 id="judul-jarak">Rata-rata harga per jarak ke kampus</h2>
+        <ul class="batang">
+          {% for g in grafik_jarak %}
+            <li>
+              <span class="nama">{{ g.rentang }}</span>
+              <span class="lajur"><span class="isi" style="width: {{ g.persen }}%"></span></span>
+              <span class="nilai">Rp {{ g.rata }} rb</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    </div>
+
+    <section class="panel" id="daftar-kos" aria-labelledby="judul-kos">
+      <h2 id="judul-kos">Daftar kos <span class="jumlah">{{ kos_list|length }} kos</span></h2>
+
+      <form class="filter" method="get" action="{% url 'index' %}#daftar-kos">
+        <div>
+          <label for="f-ac">Fasilitas AC</label>
+          <select id="f-ac" name="ac">
+            <option value="semua"{% if f.ac == 'semua' %} selected{% endif %}>Semua</option>
+            <option value="ya"{% if f.ac == 'ya' %} selected{% endif %}>Dengan AC</option>
+            <option value="tidak"{% if f.ac == 'tidak' %} selected{% endif %}>Tanpa AC</option>
+          </select>
+        </div>
+        <div>
+          <label for="f-maks">Harga maksimal (Rp rb)</label>
+          <input id="f-maks" type="text" inputmode="numeric" name="maks_harga" value="{{ f.maks_harga }}" placeholder="mis. 1000">
+        </div>
+        <div>
+          <label for="f-urut">Urutkan</label>
+          <select id="f-urut" name="urut">
+            <option value="harga_naik"{% if f.urut == 'harga_naik' %} selected{% endif %}>Termurah</option>
+            <option value="harga_turun"{% if f.urut == 'harga_turun' %} selected{% endif %}>Termahal</option>
+            <option value="jarak"{% if f.urut == 'jarak' %} selected{% endif %}>Terdekat</option>
+            <option value="rating"{% if f.urut == 'rating' %} selected{% endif %}>Rating tertinggi</option>
+          </select>
+        </div>
+        <button type="submit" class="tombol">Terapkan</button>
+      </form>
+
+      {% if kos_list %}
+        <div class="kartu-grid">
+          {% for k in kos_list %}
+            <article class="kartu">
+              <div class="kartu-atas">
+                <h3>{{ k.nama }}</h3>
+                <span class="lencana{% if k.ac == 'ya' %} aktif{% endif %}">{% if k.ac == 'ya' %}AC{% else %}Tanpa AC{% endif %}</span>
+              </div>
+              <p class="info">{{ k.jarak_km }} km dari kampus &middot; Rating {{ k.rating }}</p>
+              <p class="tarif">Rp {{ k.harga }} rb <span>per bulan</span></p>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="ket">Tidak ada kos yang cocok. Naikkan harga maksimal atau pilih Semua pada fasilitas AC.</p>
+      {% endif %}
+    </section>
+
+    <section class="panel" id="riwayat" aria-labelledby="judul-riwayat">
+      <h2 id="judul-riwayat">Prediksi terakhir</h2>
+      {% if riwayat %}
+        <div class="gulir">
+          <table>
+            <thead><tr><th>Waktu</th><th>Jarak (km)</th><th>Rating</th><th>AC</th><th>Prediksi (Rp rb)</th></tr></thead>
+            <tbody>
+            {% for r in riwayat %}
+              <tr><td>{{ r.dibuat|date:"d M Y H:i" }}</td><td>{{ r.jarak_km }}</td><td>{{ r.rating }}</td>
+                  <td>{{ r.ac }}</td><td>{{ r.harga_prediksi|floatformat:0 }}</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="ket">Belum ada prediksi. Hasil prediksi pertamamu akan tersimpan di sini.</p>
+      {% endif %}
+    </section>
+  </main>
+
+  <footer class="bawah">Tugas individu Sistem Cerdas (TI24317), Politeknik Negeri Madiun. Dataset: kos_madiun.csv (praktikum P8, 30 data).</footer>
+</body>
+</html>
